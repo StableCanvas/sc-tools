@@ -1,0 +1,12 @@
+{
+  "name": "prompt-editor",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "build": "bash ./build.sh"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT"
+}

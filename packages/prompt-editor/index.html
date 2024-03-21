@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>StableCanvas - Prompt Editor</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        width: 100%;
+        height: 100%;
+      }
+      #root {
+        width: 100%;
+        height: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module">
+      import monacoEditorloader from "https://cdn.jsdelivr.net/npm/@monaco-editor/loader@1.4.0/+esm";
+
+      const DEFAULT_VALUE = `best quality, a photograph of an astronaut riding a horse on mars attestation, hd, dramatic lighting, detailed`;
+
+      const main = async () => {
+        await monacoEditorloader.init();
+
+        monaco.languages.register({ id: "a1111-prompt" });
+
+        monaco.languages.setLanguageConfiguration("a1111-prompt", {
+          comments: {
+            lineComment: "//",
+            blockComment: ["/*", "*/"],
+          },
+
+          brackets: [
+            ["{", "}"],
+            ["[", "]"],
+            ["(", ")"],
+          ],
+
+          autoClosingPairs: [
+            { open: "{", close: "}" },
+            { open: "[", close: "]" },
+            { open: "(", close: ")" },
+            { open: '"', close: '"', notIn: ["string"] },
+            { open: "'", close: "'", notIn: ["string", "comment"] },
+            { open: "`", close: "`", notIn: ["string", "comment"] },
+            { open: "/**", close: " */", notIn: ["string"] },
+          ],
+        });
+
+        monaco.languages.setMonarchTokensProvider("a1111-prompt", {
+          tokenizer: {
+            root: [
+              // 单行注释
+              [/(\/\/).*/, "comment"],
+
+              // 多行注释
+              [/\/\*/, "comment", "@comment"],
+
+              // Extra networks
+              [/<[^:>]+(:[^:>]+)*>/, "extranetwork"],
+
+              // Scheduled prompts full
+              [
+                /\[[^\:\[\]\(\)\|]+\:[^\:\[\]\(\)\|\s]+\: *[0-9\+\-\.]+ *\]/,
+                "scheduled-full",
+              ],
+
+              // Scheduled prompts from
+              [/\[[^\:\[\]\(\)\|]+\:\: *[0-9\+\-\.]+ *\]/, "scheduled-from"],
+
+              // Scheduled prompts to
+              [/\[[^\:\[\]\(\)\|]+\: *[0-9\+\-\.]+ *\]/, "scheduled-to"],
+
+              // Scheduled prompts none to
+              [/\[\:[^\:\[\]\(\)\|]+\: *[0-9\+\-\.]+ *\]/, "scheduled-none-to"],
+
+              // Emphasized prompts
+              [/\([^\:\[\]\(\)\|]+\)/, "emphasized-positive"],
+              [/\([^\:\[\]\(\)\|]+\: *[0-9\+\-\.]+ *\)/, "emphasized-weighted"],
+              [/\[[^\:\[\]\(\)\|]+\]/, "emphasized-negative"],
+
+              // Alternates
+              [/\[[^\:\[\]\(\)\|\s]+(\|[^\:\[\]\(\)\|\s]+)+\]/, "alternate"],
+
+              // Plain text
+              [/[^(\[\)<>,]+(?![\(\[\]])/, "plain-text"],
+
+              // comma
+              [/,/, "comma"],
+            ],
+            comment: [
+              [/[^\/*]+/, "comment"],
+              // 结束多行注释
+              [/\*\//, "comment", "@pop"],
+              [/[\/*]/, "comment"],
+            ],
+          },
+        });
+
+        // Define a theme that assigns colors and styles to each token
+        monaco.editor.defineTheme("a1111-prompt-theme", {
+          base: "vs-dark",
+          inherit: true,
+          rules: [
+            {
+              token: "comment",
+              foreground: "6a9955",
+              fontStyle: "italic underline",
+            },
+            {
+              token: "extranetwork",
+              fontStyle: "italic",
+              foreground: "9CDCFE",
+            },
+            {
+              token: "scheduled-full",
+              foreground: "4FC1FF",
+              fontStyle: "bold",
+            },
+            { token: "scheduled-from", foreground: "4FC1FF" },
+            { token: "scheduled-to", foreground: "4FC1FF" },
+            { token: "scheduled-none-to", foreground: "4FC1FF" },
+            { token: "emphasized-positive", foreground: "CE9178" },
+            { token: "emphasized-weighted", foreground: "CE9178" },
+            { token: "emphasized-negative", foreground: "CE9178" },
+            { token: "alternate", fontStyle: "bold" },
+            { token: "plain-text", fontStyle: "normal", foreground: "DCDCAA" },
+          ],
+          colors: {},
+        });
+
+        let keywords = [];
+        const fetchKeywords = () =>
+          fetch(
+            "https://raw.githubusercontent.com/StableCanvas/stable-canvas-resources/main/label-table/label-10k.txt"
+          )
+            .then(async (resp) => {
+              const text = await resp.text();
+              keywords = text.split("\n");
+            })
+            .catch(() => {
+              keywords = [];
+              setTimeout(fetchKeywords, 3000);
+            });
+        fetchKeywords();
+
+        monaco.languages.registerCompletionItemProvider("a1111-prompt", {
+          provideCompletionItems: function (model, position) {
+            var suggestions = keywords.map((word, idx) => {
+              return {
+                label: word,
+                kind: monaco.languages.CompletionItemKind.Text,
+                insertText: word,
+                detail: `top ${idx + 1}`,
+                range: {
+                  startLineNumber: position.lineNumber,
+                  startColumn:
+                    position.column -
+                    model.getWordUntilPosition(position).word.length,
+                  endLineNumber: position.lineNumber,
+                  endColumn: position.column,
+                },
+              };
+            });
+
+            return { suggestions: suggestions };
+          },
+        });
+
+        // Apply the theme to Monaco Editor
+        monaco.editor.setTheme("a1111-prompt-theme");
+
+        // Hover on each property to see its docs!
+        const editor = monaco.editor.create(document.getElementById("root"), {
+          value: DEFAULT_VALUE,
+          language: "a1111-prompt",
+          automaticLayout: true,
+          wordWrap: "on",
+        });
+
+        const adjustNumber = (addAction = false) => {
+          const position = editor.getPosition();
+          const model = editor.getModel();
+          const value = model.getValue();
+          const tokens = monaco.editor.tokenize(value, "a1111-prompt");
+          const line_tokens = tokens[position.lineNumber - 1];
+
+          // TODO: 根据选中的区域选择开始和结束位置
+
+          let start_at = 0,
+            end_at = 0;
+          let token_at = null;
+
+          for (let i = 0; i < line_tokens.length; i++) {
+            const tk = line_tokens[i];
+            const nk = line_tokens[i + 1];
+            if (!nk) {
+              start_at = tk.offset;
+              end_at = model.getLineLength(position.lineNumber);
+              token_at = tk;
+              break;
+            }
+            if (nk.offset > position.column - 1) {
+              start_at = tk.offset;
+              end_at = nk.offset;
+              token_at = tk;
+              break;
+            }
+          }
+
+          const token_text = model
+            .getLineContent(position.lineNumber)
+            .slice(start_at, end_at);
+          const token_range = {
+            startColumn: start_at + 1,
+            endColumn: end_at + 1,
+            startLineNumber: position.lineNumber,
+            endLineNumber: position.lineNumber,
+          };
+          const edit = (text) =>
+            model.applyEdits(
+              [
+                {
+                  range: token_range,
+                  text: text,
+                },
+              ],
+              true
+            );
+
+          console.log(tokens, position, token_at, token_text);
+
+          if (token_at.type.startsWith("plain-text")) {
+            // plain-text: 1girl => (1girl:1)
+            edit(`(${token_text}:${addAction ? 1.1 : 0.9})`);
+          } else if (token_at.type.startsWith("emphasized")) {
+            // emphasized: (1girl:1) => (1girl:1.1)
+            const num_text = /:\s*(\d|\d\.\d)\s*[\]\)]/.exec(token_text)?.[1];
+            if (!num_text) return;
+
+            const num = Number(num_text);
+            let next_num = num + (addAction ? 0.1 : -0.1);
+            next_num = Math.max(0, next_num);
+            if (next_num === 1) {
+              edit(token_text.slice(1).replace(/:.+?\)/, ""));
+            } else {
+              edit(
+                token_text.replace(
+                  `${num_text})`,
+                  `${next_num === 0 ? 0 : next_num.toFixed(1)})`
+                )
+              );
+            }
+          } else if (token_at.type.startsWith("scheduled")) {
+            // scheduled: [:1girl:1] => [:1gilr:1.1]
+            const num_text = /:\s*(\d|\d\.\d)\s*[\]\)]/.exec(token_text)?.[1];
+            if (!num_text) return;
+
+            const num = Number(num_text);
+            let next_num = num + (addAction ? 0.1 : -0.1);
+            next_num = Math.max(0, next_num);
+            edit(
+              token_text.replace(
+                `${num_text}]`,
+                `${next_num === 0 ? 0 : next_num.toFixed(1)}]`
+              )
+            );
+          }
+        };
+
+        editor.addAction({
+          id: "inc-weight",
+          label: "inc weight",
+          keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.UpArrow],
+          run: function (editor) {
+            adjustNumber(true);
+          },
+        });
+        editor.addAction({
+          id: "dec-weight",
+          label: "dec weight",
+          keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.DownArrow],
+          run: function (editor) {
+            adjustNumber(false);
+          },
+        });
+      };
+
+      main().catch(console.error);
+    </script>
+  </body>
+</html>

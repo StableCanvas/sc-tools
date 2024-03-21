@@ -1,0 +1,12 @@
+{
+  "name": "sc-tools",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "build": "bash ./scripts/build.sh"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}
