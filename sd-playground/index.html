@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>StableCanvas - StableDiffusion Playground</title>
+    <script type="importmap">
+      {
+        "imports": {
+          "react": "https://cdn.jsdelivr.net/npm/react@18.2.0/+esm",
+          "react-dom": "https://cdn.jsdelivr.net/npm/react-dom@18.2.0/+esm",
+          "htm": "https://cdn.jsdelivr.net/npm/htm@3.1.1/+esm",
+          "styled-components": "https://cdn.jsdelivr.net/npm/styled-components@6.1.8/+esm",
+          "react-lazy-load-image-component": "https://cdn.jsdelivr.net/npm/react-lazy-load-image-component@1.6.0/+esm",
+          "@stable-canvas/sdk": "https://cdn.jsdelivr.net/npm/@stable-canvas/sdk@1.0.1/+esm"
+        }
+      }
+    </script>
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+
+        background-color: #1f1f1f;
+        color: #fff;
+
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji",
+          "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+      }
+      #app {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        width: 100vw;
+        height: 100vh;
+        padding: 24px;
+        box-sizing: border-box;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="./index.js"></script>
+  </body>
+</html>
