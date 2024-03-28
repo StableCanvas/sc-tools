@@ -11,6 +11,7 @@ for PACKAGE in "$PACKAGES_DIR"/*; do
     echo "Building $PACKAGE..."
     
     cd "$PACKAGE"
+    pnpm install
     pnpm build
     
     if [ -d "dist" ]; then
