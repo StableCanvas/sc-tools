@@ -75,3 +75,10 @@ window.addEventListener("drop", (e) => {
   const { updateFile } = useAppStore.get();
   updateFile(file);
 });
+const preventDefault = (e: DragEvent) => {
+  e.preventDefault();
+  e.stopPropagation();
+};
+window.addEventListener("dragenter", preventDefault);
+window.addEventListener("dragover", preventDefault);
+window.addEventListener("dragleave", preventDefault);
