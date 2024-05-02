@@ -5,7 +5,10 @@ import { PNGInfo } from "@stable-canvas/sd-webui-a1111-pnginfo";
 
 const parsePngInfo = async (image: any) => {
   const pngInfo = new PNGInfo(image);
-  return pngInfo.getParams();
+  return {
+    params: await pngInfo.getParams(),
+    raw_data: await pngInfo.raw_data,
+  };
 };
 
 type ParamsType = Awaited<ReturnType<PNGInfo["getParams"]>>;
@@ -18,6 +21,7 @@ type AppStatus = {
   error: null | Error;
   loading: boolean;
   file: null | File;
+  raw_data: null | any;
   updateFile: (file: File | null) => void;
 };
 
@@ -28,6 +32,8 @@ const isSameFile = (file1: File | null, file2: File | null) => {
 export const useAppStore = create<AppStatus>((set, get) => ({
   image: null,
   file: null,
+  raw_data: null,
+
   updateFile: async (file) => {
     if (isSameFile(file, get().file)) return;
     if (file === null) {
@@ -53,10 +59,10 @@ export const useAppStore = create<AppStatus>((set, get) => ({
         };
         reader.readAsDataURL(file);
       });
-      const pngInfo = await parsePngInfo(image);
-      set({ pngInfo, image, error: null });
+      const { params: pngInfo, raw_data } = await parsePngInfo(image);
+      set({ pngInfo, image, raw_data, error: null });
     } catch (error) {
-      set({ error, pngInfo: null, image: null, file: null });
+      set({ error, pngInfo: null, raw_data: null, image: null, file: null });
     } finally {
       set({ loading: false });
     }

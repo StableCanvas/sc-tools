@@ -19,6 +19,14 @@ const Title = styled.div`
   font-weight: bold;
   user-select: none;
   flex: 1;
+
+  .title-open-icon {
+    width: 2rem;
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    font-weight: 100;
+  }
 `;
 
 const Content = styled.div`
@@ -92,7 +100,8 @@ export const Accordion = memo((props: AccordionProps) => {
     <Container>
       <Header>
         <Title onClick={handleToggle}>
-          {open ? "🔽" : "▶️"} {title}
+          <span className="title-open-icon">{open ? "-" : "+"}</span>
+          {title}
         </Title>
         {hasCopyButton && (
           <CopyButton onClick={handleCopy}>

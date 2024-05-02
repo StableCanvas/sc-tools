@@ -32,8 +32,8 @@ const columnsTop = [
 ];
 
 export const InfoPanel = memo(() => {
-  const { pngInfo } = useAppStore();
-  const columns = Object.entries(pngInfo || {})
+  const { pngInfo, raw_data } = useAppStore();
+  const rows = Object.entries(pngInfo || {})
     .filter(([k, v]) => {
       return v !== "" && v !== null && v !== undefined && v !== 0;
     })
@@ -66,12 +66,26 @@ export const InfoPanel = memo(() => {
         </Accordion>
       );
     });
-  if (columns.length === 0) {
+  if (rows.length === 0) {
     return (
       <Container>
         <NoInfo>🤔No info available or parser failed.</NoInfo>
       </Container>
     );
   }
-  return <Container>{columns}</Container>;
+  if (raw_data) {
+    // raw_data row
+    const data_str = JSON.stringify(raw_data);
+    rows.push(
+      <Accordion
+        title={"Raw Data"}
+        defaultOpen
+        showCopyButton
+        requestCopy={() => data_str}
+      >
+        {data_str}
+      </Accordion>
+    );
+  }
+  return <Container>{rows}</Container>;
 });
