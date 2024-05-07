@@ -7,178 +7,191 @@ import ReactLazyLoadImage from "react-lazy-load-image-component";
 
 import { evaluate } from "@stable-canvas/sdk";
 
+import { bindReact } from "@quik-fe/stand";
+
+const create = bindReact(React);
+
 const { LazyLoadImage } = ReactLazyLoadImage;
 
-const { useEffect, useState, useRef, useCallback, useMemo, useReducer } = React;
+const { useState } = React;
 
 const html = htm.bind(React.createElement);
-
-class Store {
-  state = {};
-  listeners = new Set();
-
-  setState(partial) {
-    this.state = {
-      ...this.state,
-      ...(typeof partial === "function" ? partial(this.state) : partial),
-    };
-    this.listeners.forEach((listener) => listener(this.state));
-  }
-
-  getState() {
-    return this.state;
-  }
-
-  subscribe(listener) {
-    this.listeners.add(listener);
-    return () => this.listeners.delete(listener);
-  }
-}
-
-function create(setup) {
-  const store = new Store();
-  const set = store.setState.bind(store);
-  const get = store.getState.bind(store);
-
-  store.setState(setup(set, get));
-
-  const useStore = (selector = (x) => ({ ...x })) => {
-    const [state, update] = useState(() => selector(store.getState()));
-
-    useEffect(() => {
-      const unsubscribe = store.subscribe(() => {
-        const newState = selector(store.getState());
-        const isChanged =
-          Object.keys(newState).some((key) => newState[key] !== state[key]) ||
-          Object.keys(state).some((key) => state[key] !== newState[key]);
-        if (!isChanged) return;
-
-        update(newState);
-      });
-      return () => unsubscribe();
-    }, []);
-
-    return state;
-  };
-
-  useStore.set = set;
-  useStore.get = get;
-  useStore._store = store;
-
-  return useStore;
-}
 
 // sdc-api
 const api = {
   all_presets: () =>
-    evaluate(async (sdc_sdk) => {
-      const presets_ext = await sdc_sdk.extensions.presets().instance();
+    evaluate(async (host) => {
+      const presets_ext = await host.extensions.presets().instance();
       const all_presets = await presets_ext.list_presets();
       return all_presets;
     }),
   draw: (prompt, preset_id, width, height) =>
     evaluate(
-      async (sdc_sdk, prompt, preset_id, width, height) => {
-        const presets_ext = await sdc_sdk.extensions.presets().instance();
-        const client_ext = await sdc_sdk.extensions.client().instance();
-
-        const request_payload = await presets_ext.get_request_payload(
-          preset_id,
-          {
+      async (host, prompt, preset_id, width, height) => {
+        const presets_ext = await host.extensions.presets().instance();
+        const response = await presets_ext.request_preset({
+          payload: {
+            preset_id,
             prompt,
             width,
             height,
-          }
-        );
-        const clients = await client_ext.getAllClients();
-
-        const client = clients[0];
-
-        if (!client) {
-          throw new Error("no client");
+            control_net_units: [],
+          },
+          progress: ({ n, eta }) => {
+            // console.log({ n, eta });
+          },
+        });
+        try {
+          return await response.result;
+        } catch (error) {
+          throw error;
         }
-
-        return client.instance.request(request_payload);
       },
       prompt,
       preset_id,
       width,
       height
     ),
+
+  /**
+   *
+   * @param {string} image
+   */
+  send_to_canvas: (image) => {
+    evaluate(async (host, image) => {
+      const img = new Image();
+      img.src = image;
+      await img.decode();
+      const project = await sdc_sdk.extensions.project().instance();
+      project.editor.put_image(img, {
+        x: 64,
+        y: 64,
+      });
+    }, image);
+  },
 };
 
-const useAppStore = create((set, get) => ({
-  // states
-  width: 640,
-  height: 960,
-  presets: [],
-  text: "",
-  presetId: "",
-  current_response: null,
-  loading: false,
-  // 存所有的历史请求结果
-  response_history: [],
-  history_length: 50,
-  // 无限自动生成
-  free_auto_generate: false,
-  // 如果输入框有变化，自动触发生成
-  input_auto_generate: false,
-  // methods
-  recordResponse: (response) =>
-    set((state) => ({
-      response_history: [
-        ...state.response_history,
-        {
-          ...response,
-          id: Math.random().toString(36).substr(2),
-        },
-      ].slice(-state.history_length),
-    })),
-  setCurrentResponse: (response) => set({ current_response: response }),
-  setPresets: (presets) => set({ presets }),
-  setText: (text) => set({ text }),
-  setPresetId: (presetId) => set({ presetId }),
-  setImage: (image) => set({ image }),
-  setLoading: (loading) => set({ loading }),
-  // actions
-
-  draw: async () => {
-    const {
-      text,
-      presetId,
-      recordResponse,
-      height,
-      width,
-      free_auto_generate,
-      draw,
-      loading,
-    } = get();
-
-    if (loading) return;
-    if (!text.trim()) return;
-
-    set({ loading: true });
-    try {
-      const result = await api.draw(text, presetId, width, height);
-      result.images = result.images.map((image) => {
-        if (!image.startsWith("data:")) {
-          image = "data:image/png;base64," + image;
-        }
-        return image;
-      });
-      recordResponse(result);
-      set({ current_response: result });
-
-      if (free_auto_generate) {
-        setTimeout(draw, 500);
+/**
+ *
+ * @param {string} key
+ * @param {string[]} omit_keys
+ */
+const local_storage_mid = (key, omit_keys = []) => {
+  return (set, get) => {
+    const omit_obj = Object.fromEntries(omit_keys.map((x) => [x, undefined]));
+    if (localStorage.getItem(key)) {
+      try {
+        const init_data = JSON.parse(localStorage.getItem(key));
+        set({ ...get(), ...init_data });
+      } catch (error) {
+        console.warn("init_data parse error");
+        console.error(error);
       }
-    } catch (error) {
-      console.error(error);
-    } finally {
-      set({ loading: false });
     }
-  },
-}));
+    return [
+      (x) => {
+        set(x);
+
+        const data = {
+          ...(x || {}),
+          ...get(),
+          ...omit_obj,
+        };
+        localStorage.setItem(
+          key,
+          JSON.stringify(data, (k, v) => {
+            if (typeof v === "function") {
+              return undefined;
+            }
+            return v;
+          })
+        );
+      },
+      get,
+    ];
+  };
+};
+
+const useAppStore = create(
+  (set, get) => ({
+    // states
+    width: 640,
+    height: 960,
+    presets: [],
+    text: "",
+    presetId: "",
+    current_response: null,
+    loading: false,
+    // 存所有的历史请求结果
+    response_history: [],
+    history_length: 50,
+    // 无限自动生成
+    free_auto_generate: false,
+    // 如果输入框有变化，自动触发生成
+    input_auto_generate: false,
+    // methods
+    recordResponse: (response) =>
+      set((state) => ({
+        response_history: [
+          ...state.response_history,
+          {
+            ...response,
+            id: Math.random().toString(36).substr(2),
+          },
+        ].slice(-state.history_length),
+      })),
+    setCurrentResponse: (response) => set({ current_response: response }),
+    setPresets: (presets) => set({ presets }),
+    setText: (text) => set({ text }),
+    setPresetId: (presetId) => set({ presetId }),
+    setImage: (image) => set({ image }),
+    setLoading: (loading) => set({ loading }),
+    // actions
+
+    draw: async () => {
+      const {
+        text,
+        presetId,
+        recordResponse,
+        height,
+        width,
+        free_auto_generate,
+        draw,
+        loading,
+      } = get();
+
+      if (loading) return;
+      if (!text.trim()) return;
+
+      set({ loading: true });
+      try {
+        const result = await api.draw(text, presetId, width, height);
+        result.images = result.images.map((image) => {
+          if (!image.startsWith("data:")) {
+            image = "data:image/png;base64," + image;
+          }
+          return image;
+        });
+        recordResponse(result);
+        set({ current_response: result });
+
+        if (free_auto_generate) {
+          setTimeout(draw, 500);
+        }
+      } catch (error) {
+        console.error(error);
+      } finally {
+        set({ loading: false });
+      }
+    },
+  }),
+  local_storage_mid("@sc_ext_tools/sd_playground/app_states", [
+    "loading",
+    "current_response",
+    "response_history",
+    "presets",
+  ])
+);
 
 useAppStore._store.subscribe((state) => {
   if (state.free_auto_generate && !state.loading) {
@@ -285,7 +298,14 @@ const ImageViewer = () => {
   return html`
     <${ImageViewerContainer}>
       <img src=${image} alt="" />
-        <${ImageInfo}>${info_text}</${ImageInfo}>
+        <${ImageInfo} style=${{
+    display: image ? "" : "none",
+  }}>
+        <p>${info_text}</p>
+
+        <button onClick=${() =>
+          api.send_to_canvas(image)}>send to canvas</button>
+        </${ImageInfo}>
       <//>
       `;
 };
@@ -317,7 +337,6 @@ const HistoryItem = ({ response }) => {
   return html`
     <${HistoryImageContainer}
       onClick=${() => {
-        console.log(response);
         setCurrentResponse(response);
       }}
     >
@@ -543,6 +562,11 @@ const InputArea = () => {
         style=${{ resize: "none", height: "3rem" }}
         type="text"
         value=${text}
+        onKeyUp=${(e) => {
+          if (e.key === "Enter" && e.ctrlKey) {
+            debounceDraw();
+          }
+        }}
         onInput=${(e) => {
           setText(e.target.value);
           if (input_auto_generate) {
