@@ -11,11 +11,11 @@ importers:
   packages/pnginfo:
     dependencies:
       '@quik-fe/stand':
-        specifier: ^1.0.2
-        version: 1.0.2
+        specifier: ^1.1.2
+        version: 1.1.2
       '@stable-canvas/sd-webui-a1111-pnginfo':
-        specifier: ^1.0.2
-        version: 1.0.2
+        specifier: ^1.0.3
+        version: 1.0.3
       preact:
         specifier: ^10.13.1
         version: 10.20.1
@@ -694,8 +694,8 @@ packages:
       - supports-color
     dev: true
 
-  /@quik-fe/stand@1.0.2:
-    resolution: {integrity: sha512-4QDCE35QOr/c1/w23bdovnUlpR+WxcLR0L8BjUrG2agu1qy73coXGlc8Byrt+AKFx2zx+Z+/eUp8HWs3koA77Q==}
+  /@quik-fe/stand@1.1.2:
+    resolution: {integrity: sha512-kBqjXI4LkdpKqv/xXxa3wSE5IMa6xsw95vDpvQRrfVED//nLrIb00TepJ66TI50QkF6G3w+9YKyAD8ZHE8FdHg==}
     dev: false
 
   /@rollup/pluginutils@4.2.1:
@@ -706,8 +706,8 @@ packages:
       picomatch: 2.3.1
     dev: true
 
-  /@stable-canvas/sd-webui-a1111-pnginfo@1.0.2:
-    resolution: {integrity: sha512-eL2vX1fzfUct9DvCuth3UnEg4Zq0CNrzXIEFVQjbr+YjZGWPkxvMFHwq9O+JefKNOEv2Mlez0DGXjNi4Se49kQ==}
+  /@stable-canvas/sd-webui-a1111-pnginfo@1.0.3:
+    resolution: {integrity: sha512-xVU0JjkxbIRZ6jufHz3HbEAaZVeZoifN9RDBJuB1RxXvZmO35NNd41yVndoenuqz8qQsk/IG+FmhigSO084T+g==}
     dev: false
 
   /@types/stylis@4.2.0:

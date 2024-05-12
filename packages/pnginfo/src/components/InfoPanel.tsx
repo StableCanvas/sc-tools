@@ -22,6 +22,7 @@ const columnsTop = [
   "prompt",
   "negative_prompt",
   "sampler",
+  "steps",
   "cfg_scale",
   "size_1",
   "size_2",
